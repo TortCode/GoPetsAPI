@@ -40,7 +40,7 @@ func create_pet(c *gin.Context) {
     // insert element
     _, insert_err := coll.InsertOne(context.TODO(), pet)
     if insert_err != nil {
-        return
+        panic(insert_err)
     }
 
     c.JSON(http.StatusCreated, pet)
@@ -49,7 +49,8 @@ func create_pet(c *gin.Context) {
 func delete_pet(c *gin.Context) {
     id, objectid_err := primitive.ObjectIDFromHex(c.Param("id"))
     if objectid_err != nil {
-        panic(objectid_err)
+        c.Status(http.StatusBadRequest)
+        return
     }
     filter := bson.D{{"_id", id}}
     result, delete_err := coll.DeleteOne(context.TODO(), filter)
@@ -66,13 +67,17 @@ func delete_pet(c *gin.Context) {
 func update_pet(c *gin.Context) {
     id, objectid_err := primitive.ObjectIDFromHex(c.Param("id"))
     if objectid_err != nil {
-        panic(objectid_err)
+        c.Status(http.StatusBadRequest)
+        return
     }
 
     var updates bson.M
     if err := c.BindJSON(&updates); err != nil {
-        panic(err)
+        return
     }
+
+    delete(updates, "_id")
+    delete(updates, "birthdate")
    
     update_request := bson.D{{"$set", updates}}
     result, err := coll.UpdateByID(context.TODO(), id, update_request)
@@ -85,7 +90,6 @@ func update_pet(c *gin.Context) {
     } else {
         c.Status(http.StatusNoContent)
     }
-
 }
 
 func retrieve_pets(c *gin.Context) {
@@ -102,7 +106,46 @@ func retrieve_pets(c *gin.Context) {
     c.JSON(http.StatusOK, result)
 }
 
+func retrieve_pet_by_id(c *gin.Context) {
+    id, objectid_err := primitive.ObjectIDFromHex(c.Param("id"))
+    if objectid_err != nil {
+        c.Status(http.StatusBadRequest)
+        return
+    }
+
+    filter := bson.D{{"_id", id}}
+    var result Pet 
+    if err := coll.FindOne(context.TODO(), filter).Decode(&result);
+        err != nil {
+        if err == mongo.ErrNoDocuments {
+            c.Status(http.StatusNotFound)
+            return
+        }
+        panic(err)
+    }
+    
+    c.JSON(http.StatusOK, result)
+}
+
+func retrieve_pet_by_type(c *gin.Context) {
+    pet_type := c.Param("type")
+    filter := bson.D{{"type", pet_type}}
+
+    var result []Pet
+    cursor, err := coll.Find(context.TODO(), filter)
+    if err != nil {
+        panic(err)
+    }
+
+    if err := cursor.All(context.TODO(), &result); err != nil {
+        panic(err)
+    }
+
+    c.JSON(http.StatusOK, result)
+}
+
 func main() {
+    // load env variables from .env
     godotenv.Load()
     
     mongo_username := os.Getenv("MONGODB_USERNAME")
@@ -112,11 +155,9 @@ func main() {
         mongo_username, mongo_password, mongo_cluster)
 
     client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongo_uri))
-
     if err != nil {
         panic(err)
     }
-
     //disconnect on completion
     defer func() {
         if err := client.Disconnect(context.TODO()); err != nil {
@@ -124,17 +165,21 @@ func main() {
         }
     }()
 
+    // connect to MongoDB Atlas database
     coll = client.Database("pets_profiles").Collection("pets")
 
+    // assign handlers to paths
     router := gin.Default()
-
     pets_api := router.Group("/api/pets")
     {
-        pets_api.GET("", retrieve_pets)
-        pets_api.POST("", create_pet)
+        pets_api.GET("/", retrieve_pets)
+        pets_api.GET("/:id", retrieve_pet_by_id)
+        pets_api.GET("/types/:type", retrieve_pet_by_type)
+        pets_api.POST("/", create_pet)
         pets_api.DELETE("/:id", delete_pet)
         pets_api.PATCH("/:id", update_pet)
     }
 
+    // start server
     router.Run("localhost:3000")
 }
