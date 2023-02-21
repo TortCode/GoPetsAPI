@@ -31,6 +31,7 @@ type Pet struct {
 func create_pet(c *gin.Context) {
     var pet Pet
     if err := c.BindJSON(&pet); err != nil {
+        c.String(http.StatusBadRequest, "Improperly formatted JSON: %v", err)
         return
     }
 
@@ -49,7 +50,7 @@ func create_pet(c *gin.Context) {
 func delete_pet(c *gin.Context) {
     id, objectid_err := primitive.ObjectIDFromHex(c.Param("id"))
     if objectid_err != nil {
-        c.Status(http.StatusBadRequest)
+        c.String(http.StatusBadRequest, "Improperly formatted id: %v", objectid_err)
         return
     }
     filter := bson.D{{"_id", id}}
@@ -67,12 +68,13 @@ func delete_pet(c *gin.Context) {
 func update_pet(c *gin.Context) {
     id, objectid_err := primitive.ObjectIDFromHex(c.Param("id"))
     if objectid_err != nil {
-        c.Status(http.StatusBadRequest)
+        c.String(http.StatusBadRequest, "Improperly formatted id: %v", objectid_err)
         return
     }
 
     var updates bson.M
     if err := c.BindJSON(&updates); err != nil {
+        c.String(http.StatusBadRequest, "Improperly formatted JSON: %v", err)
         return
     }
 
@@ -109,7 +111,7 @@ func retrieve_pets(c *gin.Context) {
 func retrieve_pet_by_id(c *gin.Context) {
     id, objectid_err := primitive.ObjectIDFromHex(c.Param("id"))
     if objectid_err != nil {
-        c.Status(http.StatusBadRequest)
+        c.String(http.StatusBadRequest, "Improperly formatted id: %v", objectid_err)
         return
     }
 
