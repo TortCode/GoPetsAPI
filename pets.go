@@ -153,7 +153,7 @@ func main() {
     mongo_username := os.Getenv("MONGODB_USERNAME")
     mongo_password := url.QueryEscape(os.Getenv("MONGODB_PASSWORD"))
     mongo_cluster := os.Getenv("MONGODB_CLUSTER")
-    mongo_uri := fmt.Sprintf("mongodb+srv://%s:%s@%s/phonebookApp?retryWrites=true&w=majority",
+    mongo_uri := fmt.Sprintf("mongodb+srv://%s:%s@%s/?retryWrites=true&w=majority",
         mongo_username, mongo_password, mongo_cluster)
 
     client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(mongo_uri))
